@@ -194,9 +194,9 @@ class Server
                 //set elo score 
                 int intValue = (int)newPlayerRating;
                 dataset[i]["elo"] = intValue.ToString();
-                Console.WriteLine(intValue.ToString());
+                //Console.WriteLine(intValue.ToString());
                 intValue = (int)newOpponentRating;
-                Console.WriteLine(intValue.ToString());
+                //Console.WriteLine(intValue.ToString());
                 dataset[randomInt]["elo"] = intValue.ToString();
 
             }
@@ -227,18 +227,22 @@ class Server
         //sort recursivley if you can 
         if (lessThanPivot_dict.Count > 1)
         {
-            QuickSort(lessThanPivot_dict[0], lessThanPivot_dict);
+            lessThanPivot_dict = QuickSort(lessThanPivot_dict[0], lessThanPivot_dict);
         }
         if (moreThanPivot_dict.Count > 1)
         {
-            QuickSort(moreThanPivot_dict[0], moreThanPivot_dict);
+            moreThanPivot_dict = QuickSort(moreThanPivot_dict[0], moreThanPivot_dict);
         }
 
         //merge the two datasets (which should be sorted)
-        lessThanPivot.Concat(new List<Dictionary<string, string>> { pivotElement }); //since used this as a pivot, we lost this element to begin with 
-        lessThanPivot.Concat(moreThanPivot); 
+        lessThanPivot_dict.Concat(new List<Dictionary<string, string>> { pivotElement }); //since used this as a pivot, we lost this element to begin with 
+        lessThanPivot_dict.Concat(moreThanPivot_dict);
         //exit recursion 
-        return lessThanPivot.ToList();
+        // Merge using LINQ
+        return lessThanPivot_dict
+            .Concat(new List<Dictionary<string, string>> { pivotElement })
+            .Concat(moreThanPivot_dict)
+            .ToList();
     }
 
     //get matches for the player passed in 

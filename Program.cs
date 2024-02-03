@@ -5,78 +5,69 @@ using System.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using static System.Formats.Asn1.AsnWriter;
+using System.Reflection.Metadata.Ecma335;
+using System.Collections;
+using Microsoft.VisualBasic;
+using Newtonsoft.Json;
+using System.Runtime.InteropServices;
+using static System.Net.Mime.MediaTypeNames;
 
 class Server
 {
     static void Main(string[] args)
     {
-
         List<Dictionary<string, string>> dataset = SetUpDataset();
         Console.WriteLine("Dataset has been setup");
 
-        //set up the socket
-        int port = 13000;
-        IPAddress localAddr = IPAddress.Parse("127.0.0.1");
-        TcpListener server = new TcpListener(localAddr, port);
+        List<Dictionary<string, string>> resultsList = new List<Dictionary<string, string>>(); //for getting matches (if thats the command) 
+        // Process the data sent by the client.
+        //if I were to impliment this for real I would use gRPC or JSON or something like that
 
-        // Start listening for client requests.
-        server.Start();
-
-        // Buffer for reading data
-        Byte[] bytes = new Byte[1024 * 4];
-        String data = null;
-
-        // Enter the listening loop.
         while (true)
         {
-            Console.Write("Waiting for a connection... ");
+            Console.WriteLine("Type \'simulate\' to simulate gameplay or type a player's name to matchmake for that player");
 
-            // Perform a blocking call to pause the while loop so I can accept requests.
-            TcpClient client = server.AcceptTcpClient();
-            Console.WriteLine("Connected!");
-
-            data = null; //clear data for a new message
-
-            // Get a stream object for reading and writing
-            NetworkStream stream = client.GetStream();
-
-            int i;
-
-            // Loop until all of the data gets recieved
-            while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
+            string command = Console.ReadLine();
+            switch (command)
             {
-                // Translate data bytes to a ASCII string.
-                //we are expecting a string command
-                data = Encoding.ASCII.GetString(bytes, 0, i);
-                Console.WriteLine("Received: {0}", data);
-
-                // Process the data sent by the client.
-                switch(data) 
-
-                if(data == "simulate")
-                {
-
-                // Simulate (single threaded for now) 
-                dataset = RunSimulation(dataset);
-                Console.WriteLine($"Simulation is completed.");
-
-                }
-
-                byte[] msg = Encoding.ASCII.GetBytes("Finished");
-
-                // Send back a response.
-                stream.Write(msg, 0, msg.Length);
-                Console.WriteLine("Sent: {0}", data);
+                case ("simulate"):
+                    dataset = RunSimulation(dataset);
+                    Console.WriteLine("Simulation is completed.");
+                    break;
+                default:
+                    //assume it is a search for a player's name 
+                    Console.WriteLine("Matchmaking for player: " + command);
+                    resultsList = GetMatches(command, dataset);
+                    if (resultsList.Count == 0)
+                    {
+                        Console.WriteLine("No results found");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{resultsList.Count} matches");
+                        foreach (Dictionary<string, string> player in resultsList)
+                        {
+                            Console.WriteLine($"player name:{player["name"]}, ability score:{player["abilityScore"]}, elo:{player["elo"]} ");
+                        }
+                    }
+                    break;
             }
-
-            // Shutdown and end connection
-            client.Close();
         }
     }
 
-    static List<Dictionary<string, string>> SetUpDataset(){
 
-        Console.WriteLine("Loading Player dataset");
+
+
+
+
+
+
+
+
+    static List<Dictionary<string, string>> SetUpDataset() {
+
+        //Console.WriteLine("Loading Player dataset");
         // Path to the CSV file
         string csvFilePath = @"C:\\Users\\steph\\Downloads\\CallOfDuty.csv";
 
@@ -92,7 +83,7 @@ class Server
             Console.WriteLine(ioe.Message.ToString());
         }
 
-        Console.WriteLine(lines.Length.ToString());
+        //Console.WriteLine(lines.Length.ToString());
 
         if (lines.Length > 0)
         {
@@ -117,9 +108,9 @@ class Server
         {
             foreach (var column in row)
             {
-                Console.WriteLine($"{column.Key}: {column.Value}");
+                //Console.WriteLine($"{column.Key}: {column.Value}");
             }
-            Console.WriteLine("-----------");
+            //Console.WriteLine("-----------");
         }
 
         Console.WriteLine("Creating AbilityScores");
@@ -131,7 +122,7 @@ class Server
             row["abilityScore"] = (kd * wins / losses).ToString();
             row["elo"] = "1000"; //default on first pass. 
 
-            Console.WriteLine($"{row["name"]}'s AbilityScore is: " + row["abilityScore"]);
+            //Console.WriteLine($"{row["name"]}'s AbilityScore is: " + row["abilityScore"]);
         }
 
         return csvData;
@@ -139,13 +130,13 @@ class Server
 
     static List<Dictionary<string, string>> RunSimulation(List<Dictionary<string, string>> dataset)
     {
-        List<Task> tasks = new List<Task>();
         Random random = new Random();//seed 
         //each player plays 100 players 
-        for (int i= 0; i < dataset.Count; i++)
+        for (int i = 0; i < dataset.Count; i++)
         {
             //each player plays 100 players 
-            // Run a task with an anonymous lambda function
+            for (int x = 0; x < 100; x++)
+            {
                 int randomInt = random.Next(0, dataset.Count);
                 //handle edge cases
                 if (randomInt == i) //if you roll yourself in a match
@@ -168,8 +159,8 @@ class Server
                 float playerElo = float.Parse(player["elo"]);
 
                 //expected outcome (score) for opponent + player
-                float eoOpponent = 1f / 1f + (float) Math.Pow(10f, ((playerElo - opponentElo) / 400.0));
-                float eoPlayer = 1f / 1f + (float)Math.Pow(10f, ((opponentElo - playerElo) / 400.0));
+                float eoOpponent = 1f / (1f + (float)Math.Pow(10f, ((playerElo - opponentElo) / 400.0)));
+                float eoPlayer = 1f / (1f + (float)Math.Pow(10f, ((opponentElo - playerElo) / 400.0)));
 
 
                 //determine a winner
@@ -190,27 +181,97 @@ class Server
                 if (playerAbility > opponentAbility)
                 {
                     //player wins
-                    newPlayerRating = playerElo + 32 * (1 - playerElo);// positive if you win - score goes up 
-                    newOpponentRating = opponentElo + 32 * (0 - opponentElo); //negative if you lose- score goes down 
+                    newPlayerRating = playerElo + (32 * (1 - eoPlayer));// positive if you win - score goes up 
+                    newOpponentRating = opponentElo + (32 * (0 - eoOpponent)); //negative if you lose- score goes down 
                 }
                 else
                 {
                     //opponent wins
-                    newPlayerRating = playerElo + 32 * (0 - playerElo);// positive if you win - score goes up 
-                    newOpponentRating = opponentElo + 32 * (1 - opponentElo); //negative if you lose- score goes down 
+                    newPlayerRating = playerElo + (32 * (0 - eoPlayer));// positive if you win - score goes up 
+                    newOpponentRating = opponentElo + (32 * (1 - eoOpponent)); //negative if you lose- score goes down 
                 }
 
                 //set elo score 
                 int intValue = (int)newPlayerRating;
                 dataset[i]["elo"] = intValue.ToString();
+                Console.WriteLine(intValue.ToString());
                 intValue = (int)newOpponentRating;
+                Console.WriteLine(intValue.ToString());
                 dataset[randomInt]["elo"] = intValue.ToString();
 
+            }
         }
-        // Wait for all the tasks to complete
+            
 
-        return dataset;
+        return QuickSort(dataset[0], dataset); //sort the data after simulating
     }
+
+    //My custom implimentation of quicksort in LINQ
+    static List<Dictionary<string, string>> QuickSort(Dictionary<string,string> pivotElement, List<Dictionary<string, string>> dataset)
+    {
+        double pivot = Convert.ToDouble(pivotElement["elo"]);
+
+        IEnumerable<Dictionary<string, string>> moreThanPivot =
+            from player in dataset
+            where Convert.ToDouble(player["elo"]) > pivot
+            select player;
+
+        IEnumerable<Dictionary<string, string>> lessThanPivot =
+            from player in dataset
+            where Convert.ToDouble(player["elo"]) < pivot
+            select player;
+
+        List<Dictionary<string, string>> lessThanPivot_dict = lessThanPivot.ToList();
+        List<Dictionary<string, string>> moreThanPivot_dict = moreThanPivot.ToList();
+
+        //sort recursivley if you can 
+        if (lessThanPivot_dict.Count > 1)
+        {
+            QuickSort(lessThanPivot_dict[0], lessThanPivot_dict);
+        }
+        if (moreThanPivot_dict.Count > 1)
+        {
+            QuickSort(moreThanPivot_dict[0], moreThanPivot_dict);
+        }
+
+        //merge the two datasets (which should be sorted)
+        lessThanPivot.Concat(new List<Dictionary<string, string>> { pivotElement }); //since used this as a pivot, we lost this element to begin with 
+        lessThanPivot.Concat(moreThanPivot); 
+        //exit recursion 
+        return lessThanPivot.ToList();
+    }
+
+    //get matches for the player passed in 
+    //i think it makes way more sense to use the player's index in the dataset to know where it is and find matches close to it,
+    //but for the purposes of LINQ/Lambda demonstration I'll use those
+    static List<Dictionary<string, string>> GetMatches(string playerName, List<Dictionary<string, string>> dataset)
+    {
+        int index = dataset.FindIndex(a => a["name"] == playerName);//find where the player is in the sorted list
+
+        if(index < dataset.Count - 5)
+        {
+            //get five players above to play with 
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
+            results.Add(dataset[index + 1]);
+            results.Add(dataset[index + 2]);
+            results.Add(dataset[index + 3]);
+            results.Add(dataset[index + 4]);
+            results.Add(dataset[index + 5]);
+            return results;
+        }
+        else
+        {
+            //get five players below the current player's index to play with 
+            List<Dictionary<string, string>> results = new List<Dictionary<string, string>>();
+            results.Add(dataset[index - 1]);
+            results.Add(dataset[index - 2]);
+            results.Add(dataset[index - 3]);
+            results.Add(dataset[index - 4]);
+            results.Add(dataset[index - 5]);
+            return results; 
+        }
+    }
+
 }
 
 

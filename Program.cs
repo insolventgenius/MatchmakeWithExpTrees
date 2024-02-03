@@ -12,6 +12,7 @@ using Microsoft.VisualBasic;
 using Newtonsoft.Json;
 using System.Runtime.InteropServices;
 using static System.Net.Mime.MediaTypeNames;
+using System.Linq.Expressions;
 
 class Server
 {
@@ -166,10 +167,30 @@ class Server
                 float opponentElo = float.Parse(opponent["elo"]);
                 float playerElo = float.Parse(player["elo"]);
 
-                //expected outcome (score) for opponent + player
-                float eoOpponent = 1f / (1f + (float)Math.Pow(10f, ((playerElo - opponentElo) / 400.0)));
-                float eoPlayer = 1f / (1f + (float)Math.Pow(10f, ((opponentElo - playerElo) / 400.0)));
+                //non-Exp Tree pattern
+                //expected outcome (score) for opponent & player
+                //float eoOpponent = 1f / (1f + (float)Math.Pow(10f, ((playerElo - opponentElo) / 400.0)));
+                //float eoPlayer = 1f / (1f + (float)Math.Pow(10f, ((opponentElo - playerElo) / 400.0)));
 
+
+                //===================================================================================
+                //expected outcome (score) for opponent & player
+                //exp tree pattern 
+                var eoPlayerExpression = EloExpressionBuilder.BuildEoExpression(true); //player perspective
+                var eoOpponentExpression = EloExpressionBuilder.BuildEoExpression(false); //opponent perspective
+
+                // Compile the expressions to get the functions
+                Func<float, float, float> eoPlayerFunc = eoPlayerExpression.Compile();
+                Func<float, float, float> eoOpponentFunc = eoOpponentExpression.Compile();
+
+                // Now you can use eoPlayerFunc and eoOpponentFunc to calculate Eo values
+                float eoPlayer = eoPlayerFunc(playerElo, opponentElo);
+                float eoOpponent = eoOpponentFunc(playerElo, opponentElo);
+
+                Console.WriteLine($"EO Player: {eoPlayer}, EO Opponent: {eoOpponent}");
+
+
+                //===================================================================================
 
                 //determine a winner
                 float opponentAbility = float.Parse(opponent["abilityScore"]);
@@ -285,6 +306,42 @@ class Server
         }
     }
 
+}
+
+
+public class EloExpressionBuilder
+{
+    public static Expression<Func<float, float, float>> BuildEoExpression(bool isPlayer)
+    {
+        ParameterExpression playerElo = Expression.Parameter(typeof(float), "playerElo");
+        ParameterExpression opponentElo = Expression.Parameter(typeof(float), "opponentElo");
+
+        // because we have to flip the player's elos in the formula based on perspective 
+        //eg. if I have a high expecatation, they have a low expectation
+        Expression eloDifference = isPlayer ?
+            Expression.Subtract(opponentElo, playerElo) :
+            Expression.Subtract(playerElo, opponentElo);
+
+        ConstantExpression divisor = Expression.Constant(400.0f, typeof(float));
+        Expression divisionResult = Expression.Divide(eloDifference, divisor);
+
+        MethodCallExpression exponentResult = Expression.Call(typeof(Math).GetMethod("Pow", 
+            new Type[] { typeof(double), typeof(double) }),
+            Expression.Constant(10.0),
+            Expression.Convert(divisionResult, typeof(double))
+            
+        );
+
+        // Calculate 1 / (1 + 10^(difference / 400)).
+        ConstantExpression one = Expression.Constant(1.0f, typeof(float));
+        BinaryExpression denominator = Expression.Add(
+            one,
+            Expression.Convert(exponentResult, typeof(float)) // Convert double result back to float
+        );
+        BinaryExpression eoExpression = Expression.Divide(one, denominator);
+
+        return Expression.Lambda<Func<float, float, float>>(eoExpression, playerElo, opponentElo);
+    }
 }
 
 

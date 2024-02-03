@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using System.Runtime.InteropServices;
 using static System.Net.Mime.MediaTypeNames;
 using System.Linq.Expressions;
+using System.Reflection;
 
 class Server
 {
@@ -28,7 +29,7 @@ class Server
         while (true)
         {
             Console.WriteLine("\nType \'simulate\' to simulate gameplay, \ntype \'list players\' for the entire dataset sorted by elo, \nor type a player's name to matchmake for that player\n");
-
+            Console.Write("input:");
             string command = Console.ReadLine();
             switch (command)
             {
@@ -76,9 +77,11 @@ class Server
 
     static List<Dictionary<string, string>> SetUpDataset() {
 
-        //Console.WriteLine("Loading Player dataset");
+        Console.WriteLine("Loading Player dataset");
+        string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        Directory.SetCurrentDirectory(exeDir);
         // Path to the CSV file
-        string csvFilePath = @"C:\\Users\\steph\\Downloads\\CallOfDuty.csv";
+        string csvFilePath = @"CallOfDuty.csv";
 
 
         List<Dictionary<string, string>> csvData = new List<Dictionary<string, string>>();

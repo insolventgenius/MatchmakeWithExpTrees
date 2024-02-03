@@ -26,7 +26,7 @@ class Server
 
         while (true)
         {
-            Console.WriteLine("Type \'simulate\' to simulate gameplay or type a player's name to matchmake for that player");
+            Console.WriteLine("\nType \'simulate\' to simulate gameplay, \ntype \'list players\' for the entire dataset sorted by elo, \nor type a player's name to matchmake for that player\n");
 
             string command = Console.ReadLine();
             switch (command)
@@ -34,6 +34,14 @@ class Server
                 case ("simulate"):
                     dataset = RunSimulation(dataset);
                     Console.WriteLine("Simulation is completed.");
+                    break;
+                case ("list players"):
+                    Console.WriteLine("=====================================================================");
+                    foreach(Dictionary<string, string> player in dataset)
+                    {
+                        Console.WriteLine($"player name:{player["name"]}, ability score:{player["abilityScore"]}, elo:{player["elo"]} ");
+                    }
+                    Console.WriteLine("=====================================================================");
                     break;
                 default:
                     //assume it is a search for a player's name 
@@ -250,7 +258,8 @@ class Server
     //but for the purposes of LINQ/Lambda demonstration I'll use those
     static List<Dictionary<string, string>> GetMatches(string playerName, List<Dictionary<string, string>> dataset)
     {
-        int index = dataset.FindIndex(a => a["name"] == playerName);//find where the player is in the sorted list
+        playerName = playerName.ToLower();
+        int index = dataset.FindIndex(a => a["name"].ToLower() == playerName);//find where the player is in the sorted list
 
         if(index < dataset.Count - 5)
         {

@@ -1,7 +1,7 @@
 <!-- markdownlint-disable-next-line --><div align="center">
  ## Stephen's Matchmaking Server
  
-I have created a program inspired by a matchmaking server. This is an implimentation of [elo ranking](https://en.wikipedia.org/wiki/Elo_rating_system) using LINQ and
+I have created a program inspired by a matchmaking server. This is an implementation of [elo ranking](https://en.wikipedia.org/wiki/Elo_rating_system) using LINQ and
 [Expression Trees](https://learn.microsoft.com/en-us/dotnet/csharp/advanced-topics/expression-trees/) in C#. 
 </div>
 	
